@@ -130,7 +130,7 @@ public:
     bool IsValid() const;
     bool SetString(const char* pszSecret);
     bool SetString(const std::string& strSecret);
-
+    bool GetIndexKey(uint160& hashBytes, int& type) const;
     CBitcoinSecret(const CKey& vchSecret) { SetKey(vchSecret); }
     CBitcoinSecret() {}
 };
