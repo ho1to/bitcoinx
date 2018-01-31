@@ -9,6 +9,9 @@
 #include "coins.h"
 #include "dbwrapper.h"
 #include "chain.h"
+#include "addressindex.h"
+#include "spentindex.h"
+#include "timestampindex.h"
 
 #include <map>
 #include <string>
@@ -109,7 +112,7 @@ private:
 class CBlockTreeDB : public CDBWrapper
 {
 public:
-    CBlockTreeDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
+    CBlockTreeDB(size_t nCacheSize, bool fMemory, bool fWipe, bool compression, int maxOpenFiles, size_t maxFileSize);
 private:
     CBlockTreeDB(const CBlockTreeDB&);
     void operator=(const CBlockTreeDB&);

@@ -1588,7 +1588,7 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out)
 
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
  *  When FAILED is returned, view is left in an indeterminate state. */
-static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view)
+static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view, bool ignoreAddressIndex = false)
 {
     bool fClean = true;
 
@@ -1626,19 +1626,19 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                     std::vector<unsigned char> hashBytes(out.scriptPubKey.begin()+2, out.scriptPubKey.begin()+22);
 
                     // undo receiving activity
-                    addressIndex.push_back(std::make_pair(CAddressIndexKey(2, uint160(hashBytes), pindex->nHeight, i, txid, k, false), out.nValue));
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(2, uint160(hashBytes), pindex->nHeight, i, hash, k, false), out.nValue));
 
                     // undo unspent index
-                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(2, uint160(hashBytes), txid, k), CAddressUnspentValue()));
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(2, uint160(hashBytes), hash, k), CAddressUnspentValue()));
 
                 } else if (out.scriptPubKey.IsPayToPublicKeyHash()) {
                     std::vector<unsigned char> hashBytes(out.scriptPubKey.begin()+3, out.scriptPubKey.begin()+23);
 
                     // undo receiving activity
-                    addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, txid, k, false), out.nValue));
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, hash, k, false), out.nValue));
 
                     // undo unspent index
-                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), txid, k), CAddressUnspentValue()));
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), hash, k), CAddressUnspentValue()));
 
                 } else {
                     continue;
@@ -1670,7 +1670,10 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
             }
             for (unsigned int j = tx.vin.size(); j-- > 0;) {
                 const COutPoint &out = tx.vin[j].prevout;
-                int res = ApplyTxInUndo(std::move(txundo.vprevout[j]), view, out);
+                //int res = ApplyTxInUndo(std::move(txundo.vprevout[j]), view, out);
+                Coin &undo = txundo.vprevout[j];
+                int res = ApplyTxInUndo(std::move(undo), view, out);
+
                 if (res == DISCONNECT_FAILED) return DISCONNECT_FAILED;
                 fClean = fClean && res != DISCONNECT_UNCLEAN;
                 
@@ -1682,12 +1685,12 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                 }
 
                 if (fAddressIndex) {
-                    const CTxOut &prevout = view.AccessCoin(tx.vin[j]);
+                    const CTxOut &prevout = view.AccessCoin(tx.vin[j].prevout).out;
                     if (prevout.scriptPubKey.IsPayToScriptHash()) {
                         std::vector<unsigned char> hashBytes(prevout.scriptPubKey.begin()+2, prevout.scriptPubKey.begin()+22);
 
                         // undo spending activity
-                        addressIndex.push_back(std::make_pair(CAddressIndexKey(2, uint160(hashBytes), pindex->nHeight, i, txid, j, true), prevout.nValue * -1));
+                        addressIndex.push_back(std::make_pair(CAddressIndexKey(2, uint160(hashBytes), pindex->nHeight, i, hash, j, true), prevout.nValue * -1));
 
                         // restore unspent index
                         addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(2, uint160(hashBytes), input.prevout.hash, input.prevout.n), CAddressUnspentValue(prevout.nValue, prevout.scriptPubKey, undo.nHeight)));
@@ -1697,7 +1700,7 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                         std::vector<unsigned char> hashBytes(prevout.scriptPubKey.begin()+3, prevout.scriptPubKey.begin()+23);
 
                         // undo spending activity
-                        addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, txid, j, true), prevout.nValue * -1));
+                        addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, hash, j, true), prevout.nValue * -1));
 
                         // restore unspent index
                         addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), input.prevout.hash, input.prevout.n), CAddressUnspentValue(prevout.nValue, prevout.scriptPubKey, undo.nHeight)));
@@ -1714,13 +1717,15 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
 
     // move best block pointer to prevout block
     view.SetBestBlock(pindex->pprev->GetBlockHash());
-    
-    if (fAddressIndex) {
+ 
+    if (!ignoreAddressIndex && fAddressIndex) {
         if (!pblocktree->EraseAddressIndex(addressIndex)) {
-            return AbortNode(state, "Failed to delete address index");
+            error("Failed to delete address index");
+            return DISCONNECT_FAILED;
         }
         if (!pblocktree->UpdateAddressUnspentIndex(addressUnspentIndex)) {
-            return AbortNode(state, "Failed to write address unspent index");
+            error("Failed to write address unspent index");
+            return DISCONNECT_FAILED;
         }
     }
 
@@ -1863,7 +1868,7 @@ static int64_t nTimeTotal = 0;
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()
  *  can fail if those validity checks fail (among other reasons). */
 static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex,
-                  CCoinsViewCache& view, const CChainParams& chainparams, bool fJustCheck = false)
+                  CCoinsViewCache& view, const CChainParams& chainparams, bool fJustCheck = false, bool ignoreAddressIndex = false)
 {
     AssertLockHeld(cs_main);
     assert(pindex);
@@ -2013,7 +2018,7 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                 for (size_t j = 0; j < tx.vin.size(); j++) {
 
                     const CTxIn input = tx.vin[j];
-                    const CTxOut &prevout = view.AccessCoin(tx.vin[j]);
+                    const CTxOut &prevout = view.AccessCoin(tx.vin[j].prevout).out;
                     uint160 hashBytes;
                     int addressType;
 
@@ -2148,7 +2153,7 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
             return AbortNode(state, "Failed to write transaction index");
 
 
-    if (fAddressIndex) {
+    if (!ignoreAddressIndex && fAddressIndex)  {
         if (!pblocktree->WriteAddressIndex(addressIndex)) {
             return AbortNode(state, "Failed to write address index");
         }
@@ -2158,11 +2163,11 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
         }
     }
 
-    if (fSpentIndex)
+    if (!ignoreAddressIndex && fSpentIndex)
         if (!pblocktree->UpdateSpentIndex(spentIndex))
             return AbortNode(state, "Failed to write transaction index");
 
-    if (fTimestampIndex) {
+    if (!ignoreAddressIndex && fTimestampIndex) {
         unsigned int logicalTS = pindex->nTime;
         unsigned int prevLogicalTS = 0;
 
@@ -4047,7 +4052,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
         // check level 3: check for inconsistencies during memory-only disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState && (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheUsage) {
             assert(coins.GetBestBlock() == pindex->GetBlockHash());
-            DisconnectResult res = DisconnectBlock(block, pindex, coins);
+            DisconnectResult res = DisconnectBlock(block, pindex, coins, true);
             if (res == DISCONNECT_FAILED) {
                 return error("VerifyDB(): *** irrecoverable inconsistency in block data at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
             }
@@ -4075,7 +4080,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
             CBlock block;
             if (!ReadBlockFromDisk(block, pindex, chainparams.GetConsensus()))
                 return error("VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
-            if (!ConnectBlock(block, state, pindex, coins, chainparams))
+            if (!ConnectBlock(block, state, pindex, coins, chainparams, false, true))
                 return error("VerifyDB(): *** found unconnectable block at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
         }
     }
@@ -4318,17 +4323,17 @@ bool LoadBlockIndex(const CChainParams& chainparams)
         pblocktree->WriteFlag("txindex", fTxIndex);
 
         // Use the provided setting for -addressindex in the new database
-        fAddressIndex = GetBoolArg("-addressindex", DEFAULT_ADDRESSINDEX);
+        fAddressIndex = gArgs.GetBoolArg("-addressindex", DEFAULT_ADDRESSINDEX);
         pblocktree->WriteFlag("addressindex", fAddressIndex);
         LogPrintf("%s: address index %s\n", __func__, fAddressIndex ? "enabled" : "disabled");
 
         // Use the provided setting for -timestampindex in the new database
-        fTimestampIndex = GetBoolArg("-timestampindex", DEFAULT_TIMESTAMPINDEX);
+        fTimestampIndex = gArgs.GetBoolArg("-timestampindex", DEFAULT_TIMESTAMPINDEX);
         pblocktree->WriteFlag("timestampindex", fTimestampIndex);
         LogPrintf("%s: timestamp index %s\n", __func__, fTimestampIndex ? "enabled" : "disabled");
 
         // Use the provided setting for -spentindex in the new database
-        fSpentIndex = GetBoolArg("-spentindex", DEFAULT_SPENTINDEX);
+        fSpentIndex = gArgs.GetBoolArg("-spentindex", DEFAULT_SPENTINDEX);
         pblocktree->WriteFlag("spentindex", fSpentIndex);
         LogPrintf("%s: spent index %s\n", __func__, fSpentIndex ? "enabled" : "disabled");
         

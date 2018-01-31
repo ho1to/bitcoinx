@@ -211,11 +211,11 @@ UniValue blockToDeltasJSON(const CBlock& block, const CBlockIndex* blockindex)
             UniValue delta(UniValue::VOBJ);
 
             if (out.scriptPubKey.IsPayToScriptHash()) {
-                vector<unsigned char> hashBytes(out.scriptPubKey.begin()+2, out.scriptPubKey.begin()+22);
+                std::vector<unsigned char> hashBytes(out.scriptPubKey.begin()+2, out.scriptPubKey.begin()+22);
                 delta.push_back(Pair("address", CBitcoinAddress(CScriptID(uint160(hashBytes))).ToString()));
 
             } else if (out.scriptPubKey.IsPayToPublicKeyHash()) {
-                vector<unsigned char> hashBytes(out.scriptPubKey.begin()+3, out.scriptPubKey.begin()+23);
+                std::vector<unsigned char> hashBytes(out.scriptPubKey.begin()+3, out.scriptPubKey.begin()+23);
                 delta.push_back(Pair("address", CBitcoinAddress(CKeyID(uint160(hashBytes))).ToString()));
             } else {
                 continue;
@@ -235,6 +235,8 @@ UniValue blockToDeltasJSON(const CBlock& block, const CBlockIndex* blockindex)
     result.push_back(Pair("time", block.GetBlockTime()));
     result.push_back(Pair("mediantime", (int64_t)blockindex->GetMedianTimePast()));
     result.push_back(Pair("nonce", (uint64_t)block.nNonce));
+    //result.push_back(Pair("nonceUint32", (uint64_t)((uint32_t)block.nNonce.GetUint64(0))));
+    //result.push_back(Pair("nonce", block.nNonce.GetHex()));
     result.push_back(Pair("bits", strprintf("%08x", block.nBits)));
     result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
     result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
@@ -748,7 +750,7 @@ UniValue getmempoolentry(const JSONRPCRequest& request)
 UniValue getblockdeltas(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
-        throw runtime_error("");
+        throw std::runtime_error("");
 
     std::string strHash = request.params[0].get_str();
     uint256 hash(uint256S(strHash));
@@ -771,7 +773,7 @@ UniValue getblockdeltas(const JSONRPCRequest& request)
 UniValue getblockhashes(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() < 2)
-        throw runtime_error(
+        throw std::runtime_error(
             "getblockhashes timestamp\n"
             "\nReturns array of hashes of blocks within the timestamp range provided.\n"
             "\nArguments:\n"

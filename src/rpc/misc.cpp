@@ -649,39 +649,6 @@ UniValue echo(const JSONRPCRequest& request)
     return request.params;
 }
 
-static const CRPCCommand commands[] =
-{ //  category              name                      actor (function)         okSafeMode
-  //  --------------------- ------------------------  -----------------------  ----------
-    { "control",            "getinfo",                &getinfo,                true,  {} }, /* uses wallet if enabled */
-    { "control",            "getmemoryinfo",          &getmemoryinfo,          true,  {"mode"} },
-    { "util",               "validateaddress",        &validateaddress,        true,  {"address"} }, /* uses wallet if enabled */
-    { "util",               "createmultisig",         &createmultisig,         true,  {"nrequired","keys"} },
-    { "util",               "verifymessage",          &verifymessage,          true,  {"address","signature","message"} },
-    { "util",               "signmessagewithprivkey", &signmessagewithprivkey, true,  {"privkey","message"} },
-
-    /* Address index */
-    { "addressindex",       "getaddressmempool",      &getaddressmempool,     true,  {} },
-    { "addressindex",       "getaddressutxos",        &getaddressutxos,       false, {} },
-    { "addressindex",       "getaddressdeltas",       &getaddressdeltas,      false, {} },
-    { "addressindex",       "getaddresstxids",        &getaddresstxids,       false, {} },
-    { "addressindex",       "getaddressbalance",      &getaddressbalance,     false, {} },
-
-    /* Blockchain */
-    { "blockchain",         "getspentinfo",           &getspentinfo,          false, {} },
-
-
-    /* Not shown in help */
-    { "hidden",             "setmocktime",            &setmocktime,            true,  {"timestamp"}},
-    { "hidden",             "echo",                   &echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
-    { "hidden",             "echojson",               &echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
-    { "hidden",             "logging",                &logging,                true,  {"include", "exclude"}},
-};
-
-void RegisterMiscRPCCommands(CRPCTable &t)
-{
-    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        t.appendCommand(commands[vcidx].name, &commands[vcidx]);
-}
 
 bool getAddressFromIndex(const int &type, const uint160 &hash, std::string &address)
 {
@@ -744,7 +711,7 @@ bool timestampSort(std::pair<CMempoolAddressDeltaKey, CMempoolAddressDelta> a,
 UniValue getaddressmempool(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
-        throw runtime_error(
+        throw std::runtime_error(
             "getaddressmempool\n"
             "\nReturns all mempool deltas for an address (requires addressindex to be enabled).\n"
             "\nArguments:\n"
@@ -815,7 +782,7 @@ UniValue getaddressmempool(const JSONRPCRequest& request)
 UniValue getaddressutxos(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
-        throw runtime_error(
+        throw std::runtime_error(
             "getaddressutxos\n"
             "\nReturns all unspent outputs for an address (requires addressindex to be enabled).\n"
             "\nArguments:\n"
@@ -901,7 +868,7 @@ UniValue getaddressutxos(const JSONRPCRequest& request)
 UniValue getaddressdeltas(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1 || !request.params[0].isObject())
-        throw runtime_error(
+        throw std::runtime_error(
             "getaddressdeltas\n"
             "\nReturns all changes for an address (requires addressindex to be enabled).\n"
             "\nArguments:\n"
@@ -1026,7 +993,7 @@ UniValue getaddressdeltas(const JSONRPCRequest& request)
 UniValue getaddressbalance(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
-        throw runtime_error(
+        throw std::runtime_error(
             "getaddressbalance\n"
             "\nReturns the balance for an address(es) (requires addressindex to be enabled).\n"
             "\nArguments:\n"
@@ -1082,7 +1049,7 @@ UniValue getaddressbalance(const JSONRPCRequest& request)
 UniValue getaddresstxids(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 1)
-        throw runtime_error(
+        throw std::runtime_error(
             "getaddresstxids\n"
             "\nReturns the txids for an address(es) (requires addressindex to be enabled).\n"
             "\nArguments:\n"
@@ -1166,7 +1133,7 @@ UniValue getspentinfo(const JSONRPCRequest& request)
 {
 
     if (request.fHelp || request.params.size() != 1 || !request.params[0].isObject())
-        throw runtime_error(
+        throw std::runtime_error(
             "getspentinfo\n"
             "\nReturns the txid and index where an output is spent.\n"
             "\nArguments:\n"
@@ -1208,4 +1175,38 @@ UniValue getspentinfo(const JSONRPCRequest& request)
     obj.push_back(Pair("height", value.blockHeight));
 
     return obj;
+}
+
+static const CRPCCommand commands[] =
+{ //  category              name                      actor (function)         okSafeMode
+  //  --------------------- ------------------------  -----------------------  ----------
+    { "control",            "getinfo",                &getinfo,                true,  {} }, /* uses wallet if enabled */
+    { "control",            "getmemoryinfo",          &getmemoryinfo,          true,  {"mode"} },
+    { "util",               "validateaddress",        &validateaddress,        true,  {"address"} }, /* uses wallet if enabled */
+    { "util",               "createmultisig",         &createmultisig,         true,  {"nrequired","keys"} },
+    { "util",               "verifymessage",          &verifymessage,          true,  {"address","signature","message"} },
+    { "util",               "signmessagewithprivkey", &signmessagewithprivkey, true,  {"privkey","message"} },
+
+    /* Address index */
+    { "addressindex",       "getaddressmempool",      &getaddressmempool,     true,  {} },
+    { "addressindex",       "getaddressutxos",        &getaddressutxos,       false, {} },
+    { "addressindex",       "getaddressdeltas",       &getaddressdeltas,      false, {} },
+    { "addressindex",       "getaddresstxids",        &getaddresstxids,       false, {} },
+    { "addressindex",       "getaddressbalance",      &getaddressbalance,     false, {} },
+
+    /* Blockchain */
+    { "blockchain",         "getspentinfo",           &getspentinfo,          false, {} },
+
+
+    /* Not shown in help */
+    { "hidden",             "setmocktime",            &setmocktime,            true,  {"timestamp"}},
+    { "hidden",             "echo",                   &echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
+    { "hidden",             "echojson",               &echo,                   true,  {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
+    { "hidden",             "logging",                &logging,                true,  {"include", "exclude"}},
+};
+
+void RegisterMiscRPCCommands(CRPCTable &t)
+{
+    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
+        t.appendCommand(commands[vcidx].name, &commands[vcidx]);
 }

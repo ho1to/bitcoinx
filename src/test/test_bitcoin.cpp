@@ -80,7 +80,7 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
         GetMainSignals().RegisterBackgroundSignalScheduler(scheduler);
 
         mempool.setSanityCheck(1.0);
-        pblocktree = new CBlockTreeDB(1 << 20, true);
+        pblocktree = new CBlockTreeDB(1 << 20, true, false, false, 2000, 2000);
         pcoinsdbview = new CCoinsViewDB(1 << 23, true);
         pcoinsTip = new CCoinsViewCache(pcoinsdbview);
         if (!LoadGenesisBlock(chainparams)) {
