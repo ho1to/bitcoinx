@@ -1682,7 +1682,7 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
                 }
 
                 if (fAddressIndex) {
-                    const CTxOut &prevout = view.GetOutputFor(tx.vin[j]);
+                    const CTxOut &prevout = view.AccessCoin(tx.vin[j]);
                     if (prevout.scriptPubKey.IsPayToScriptHash()) {
                         std::vector<unsigned char> hashBytes(prevout.scriptPubKey.begin()+2, prevout.scriptPubKey.begin()+22);
 
@@ -2013,7 +2013,7 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
                 for (size_t j = 0; j < tx.vin.size(); j++) {
 
                     const CTxIn input = tx.vin[j];
-                    const CTxOut &prevout = view.GetOutputFor(tx.vin[j]);
+                    const CTxOut &prevout = view.AccessCoin(tx.vin[j]);
                     uint160 hashBytes;
                     int addressType;
 

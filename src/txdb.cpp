@@ -13,6 +13,7 @@
 #include "util.h"
 #include "ui_interface.h"
 #include "init.h"
+#include "validation.h"
 
 #include <stdint.h>
 
